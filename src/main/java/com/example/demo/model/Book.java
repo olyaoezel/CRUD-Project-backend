@@ -1,6 +1,7 @@
 package com.example.demo.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import javax.persistence.*;
 import javax.xml.bind.annotation.XmlRootElement;
@@ -73,6 +74,13 @@ public class Book  {
     private byte[] picByte;
 
     @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.REFRESH})
+    @JoinTable(name = "user_has_book", joinColumns = @JoinColumn(name = "book_id", referencedColumnName = "id"),
+            inverseJoinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id"))
+    private User user;
+
+
+    @JsonIgnore
     @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.REFRESH}, fetch = FetchType.LAZY)
     @JoinColumn(name = "genre")
     private BookGenres bookGenres;
@@ -141,4 +149,13 @@ public class Book  {
     public void setBookGenres(BookGenres bookGenres) {
         this.bookGenres = bookGenres;
     }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
 }

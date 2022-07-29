@@ -2,13 +2,16 @@ package com.example.demo.controller;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.example.demo.model.Book;
 import com.example.demo.model.BookGenres;
-import com.example.demo.db.BookGenresRepository;
-import com.example.demo.db.BookRepository;
+import com.example.demo.repository.BookGenresRepository;
+import com.example.demo.repository.BookRepository;
+import com.example.demo.repository.UserRepository;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +20,8 @@ import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,6 +36,9 @@ public class BookController {
     @Autowired
     BookGenresRepository bookGenresRepository;
 
+    @Autowired
+    UserRepository userRepository;
+
     @PostMapping(value="/upload",  consumes = {  "multipart/form-data" }, produces = { MediaType.APPLICATION_JSON_VALUE }) //uploads the book info (Request part 'bookFile' is for the image)
     public ResponseEntity<?> uploadBook(@RequestPart("bookFile") @NotNull MultipartFile file,
                                         @RequestPart("book") String book,
@@ -42,6 +50,10 @@ public class BookController {
           file.getBytes());
 
         newBook.setBookGenres(bookGenresRepository.findByGenre(genre).get());
+
+        String auth = SecurityContextHolder.getContext().getAuthentication().getName();
+        newBook.setUser(userRepository.findByUsername(auth));
+
         bookRepository.save(newBook);
 
         return new ResponseEntity<>(HttpStatus.OK);
@@ -51,12 +63,21 @@ public class BookController {
     public Page<Book> getByGenre(@PathVariable("genre") String genre,
                                  @RequestParam(defaultValue = "0") Integer pageNo,
                                  @RequestParam(defaultValue = "10") Integer pageSize,
-                                 @RequestParam(defaultValue = "id") String sortBy) throws IOException {
+                                 @RequestParam(defaultValue = "id") String sortBy) {
         Optional<BookGenres> genreFound = bookGenresRepository.findByGenre(genre);
         Pageable paging = PageRequest.of(pageNo, pageSize, Sort.by(sortBy));
-        Page<Book> retrievedBooks = bookRepository.findByBookGenres(genreFound.get(), paging);
+//        Page<Book> retrievedBooks = bookRepository.findByBookGenres(genreFound.get(), paging);
 
-        return retrievedBooks;
+
+        String auth = SecurityContextHolder.getContext().getAuthentication().getName();
+        Long userId = userRepository.findByUsername(auth).getId();
+        Page<Book> pagedResult = bookRepository.findByUserId(userId, paging);
+        List<Book> newList = pagedResult.stream().filter(book -> book.getBookGenres().getGenre().equalsIgnoreCase(genreFound.get().getGenre())).collect(Collectors.toList());
+        List<Long> ids = new ArrayList<>();
+        for (Book book : newList) ids.add(book.getId());
+        Page<Book> listOfBooks = bookRepository.findByIdIn(ids, paging);
+
+        return listOfBooks;
     }
 
 
@@ -71,14 +92,27 @@ public class BookController {
     }
 
 
-    @GetMapping("/getAllBooks") // gets a list of all books with a pagination and sorted by a certain criterion  if specified. Returns the items only for 1 page
+    @GetMapping("/getAllBooks") // gets a list of all books which belong to the current user with a pagination and sorted by a certain criterion  if specified. Returns the items only for 1 page
     public Page<Book> getAllBooks(@RequestParam(defaultValue = "0") Integer pageNo,
+                                  @RequestParam(defaultValue = "10") Integer pageSize,
+                                  @RequestParam(defaultValue = "id") String sortBy)  {
+        Pageable paging = PageRequest.of(pageNo, pageSize, Sort.by(sortBy));
+
+        String auth = SecurityContextHolder.getContext().getAuthentication().getName();
+        Long userId = userRepository.findByUsername(auth).getId();
+        Page<Book> pagedResult = bookRepository.findByUserId(userId, paging);
+
+       return pagedResult;
+    }
+
+    @GetMapping("/getAllLibraryBooks") // gets a list of all books from the library with a pagination and sorted by a certain criterion  if specified. Returns the items only for 1 page
+    public Page<Book> getAllLibraryBooks(@RequestParam(defaultValue = "0") Integer pageNo,
                                   @RequestParam(defaultValue = "10") Integer pageSize,
                                   @RequestParam(defaultValue = "id") String sortBy)  {
         Pageable paging = PageRequest.of(pageNo, pageSize, Sort.by(sortBy));
         Page<Book> pagedResult = bookRepository.findAll(paging);
 
-       return pagedResult;
+        return pagedResult;
     }
 
     @GetMapping("/getFilteredBooks") //gets the book/books which title contains the request from the search input. The output is with a pagination and sorted by a certain criterion  if specified
@@ -87,9 +121,17 @@ public class BookController {
                                        @RequestParam(defaultValue = "id") String sortBy,
                                        @RequestParam(name = "bookTitle") String bookTitle)  {
         Pageable paging = PageRequest.of(pageNo, pageSize, Sort.by(sortBy));
-        Page<Book> pagedResult = bookRepository.findAllByNameContains(bookTitle, paging);
+//        Page<Book> pagedResult = bookRepository.findAllByNameContains(bookTitle, paging);
 
-        return pagedResult;
+        String auth = SecurityContextHolder.getContext().getAuthentication().getName();
+        Long userId = userRepository.findByUsername(auth).getId();
+        Page<Book> pagedResult = bookRepository.findByUserId(userId, paging);
+        List<Book> newList = pagedResult.stream().filter(book -> book.getName().contains(bookTitle)).collect(Collectors.toList());
+        List<Long> ids = new ArrayList<>();
+        for (Book book : newList) ids.add(book.getId());
+        Page<Book> listOfBooks = bookRepository.findByIdIn(ids, paging);
+
+        return listOfBooks;
     }
 
     @PutMapping(value="/update/{id}", consumes = {  "multipart/form-data" }) // updates the book info or creates a new one if it doesn't exist yet due to an occurred error of retrieving one

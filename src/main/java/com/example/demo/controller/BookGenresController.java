@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.model.BookGenres;
-import com.example.demo.db.BookGenresRepository;
+import com.example.demo.repository.BookGenresRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

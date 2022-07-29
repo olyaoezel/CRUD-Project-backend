@@ -1,6 +1,6 @@
 package com.example.demo.Initializer;
 
-import com.example.demo.db.BookGenresRepository;
+import com.example.demo.repository.BookGenresRepository;
 import com.example.demo.model.BookGenres;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
